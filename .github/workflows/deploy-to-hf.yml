@@ -37,6 +37,7 @@ jobs:
           # 复制必要文件到部署目录
           cp examples/app.py /tmp/hf-deploy/app.py
           cp requirements.txt /tmp/hf-deploy/
+          cp pyproject.toml /tmp/hf-deploy/
           cp -r src /tmp/hf-deploy/
           
           cp LICENSE /tmp/hf-deploy/ || echo "LICENSE not found, skipping"
