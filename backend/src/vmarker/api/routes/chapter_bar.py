@@ -58,6 +58,7 @@ class GenerateRequest(BaseModel):
     theme: str = "tech-blue"
     format: str = "mp4"  # "mp4" 通用格式 / "mov" 透明背景
     custom_colors: CustomColors | None = None  # 自定义配色（优先于 theme）
+    key_frame_interval: float | None = None  # 关键帧间隔（秒）
 
 
 # =============================================================================
@@ -198,7 +199,13 @@ async def generate_video(request: GenerateRequest):
     with TemporaryDirectory() as tmpdir:
         output = Path(tmpdir) / filename
         try:
-            cb.generate(config, output, format=request.format, scheme=scheme)
+            cb.generate(
+                config,
+                output,
+                format=request.format,
+                scheme=scheme,
+                key_frame_interval=request.key_frame_interval,
+            )
         except RuntimeError as e:
             raise HTTPException(500, f"生成失败: {e}")
 

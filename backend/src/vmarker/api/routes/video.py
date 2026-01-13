@@ -72,6 +72,8 @@ class ComposeRequest(BaseModel):
     played_color: str = "#3B82F6"
     unplayed_color: str = "#E5E7EB"
     progress_height: int = 8
+    # 性能优化
+    key_frame_interval: float | None = None
 
 
 # =============================================================================
@@ -284,7 +286,13 @@ def _generate_chapter_bar(session: TempSession, source_info: video_probe.VideoIn
 
     # 生成 Bar 视频
     bar_path = session.get_path("chapter_bar.mp4")
-    cb.generate(config, bar_path, format="mp4", scheme=scheme)
+    cb.generate(
+        config,
+        bar_path,
+        format="mp4",
+        scheme=scheme,
+        key_frame_interval=request.key_frame_interval,
+    )
 
     return bar_path
 
@@ -300,7 +308,12 @@ def _generate_progress_bar(session: TempSession, source_info: video_probe.VideoI
     )
 
     bar_path = session.get_path("progress_bar.mp4")
-    pb.generate(config, bar_path, format="mp4")
+    pb.generate(
+        config,
+        bar_path,
+        format="mp4",
+        key_frame_interval=request.key_frame_interval,
+    )
 
     return bar_path
 

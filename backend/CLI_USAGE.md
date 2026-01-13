@@ -92,6 +92,7 @@ vmarker chapter input.srt
 uv run acb input.srt                          # 默认配置
 uv run acb input.srt --theme tech-blue        # 指定主题
 uv run acb input.srt --output bar.mp4         # 指定输出
+uv run acb input.srt --key-frame-interval 0.5 # 关键帧渲染优化
 
 # 安装模式
 acb input.srt

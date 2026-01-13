@@ -72,6 +72,7 @@ def _run_chapter_bar(
     theme: str,
     width: int,
     height: int,
+    key_frame_interval: Optional[float],
     api_key: Optional[str],
     api_base: str,
     model: str,
@@ -162,7 +163,12 @@ def _run_chapter_bar(
             progress.update(task, completed=int(cur / total * 100))
 
         try:
-            cb.generate(config, output, progress_callback=on_progress)
+            cb.generate(
+                config,
+                output,
+                progress_callback=on_progress,
+                key_frame_interval=key_frame_interval,
+            )
         except RuntimeError as e:
             console.print(f"\n[red]生成失败: {e}[/red]")
             raise typer.Exit(1)
@@ -191,6 +197,10 @@ def acb_main(
     theme: Annotated[str, typer.Option("-t", "--theme")] = "tech-blue",
     width: Annotated[int, typer.Option("-w", "--width", min=100, max=4096)] = 1920,
     height: Annotated[int, typer.Option("-H", "--height", min=20, max=200)] = 60,
+    key_frame_interval: Annotated[
+        Optional[float],
+        typer.Option("--key-frame-interval", min=0.05, help="关键帧间隔(秒)"),
+    ] = None,
     api_key: Annotated[Optional[str], typer.Option("--api-key", envvar="API_KEY")] = None,
     api_base: Annotated[
         str, typer.Option("--api-base", envvar="API_BASE")
@@ -206,6 +216,7 @@ def acb_main(
         theme,
         width,
         height,
+        key_frame_interval,
         api_key,
         api_base,
         model,
@@ -245,6 +256,10 @@ def cmd_chapter(
     theme: Annotated[str, typer.Option("-t", "--theme")] = "tech-blue",
     width: Annotated[int, typer.Option("-w", "--width", min=100, max=4096)] = 1920,
     height: Annotated[int, typer.Option("-H", "--height", min=20, max=200)] = 60,
+    key_frame_interval: Annotated[
+        Optional[float],
+        typer.Option("--key-frame-interval", min=0.05, help="关键帧间隔(秒)"),
+    ] = None,
     api_key: Annotated[Optional[str], typer.Option("--api-key", envvar="API_KEY")] = None,
     api_base: Annotated[
         str, typer.Option("--api-base", envvar="API_BASE")
@@ -260,6 +275,7 @@ def cmd_chapter(
         theme,
         width,
         height,
+        key_frame_interval,
         api_key,
         api_base,
         model,
