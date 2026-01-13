@@ -89,6 +89,8 @@ class VideoEncoder:
         *,
         progress_callback: ProgressCallback | None = None,
         format: str = "webm",
+        key_frame_interval: float | None = None,
+        interpolate: bool = True,
     ) -> Path:
         """
         编码视频
@@ -99,37 +101,79 @@ class VideoEncoder:
             output_path: 输出路径
             progress_callback: 进度回调
             format: 输出格式 ("webm" 或 "mov")
+            key_frame_interval: 关键帧间隔（秒），设置后只渲染关键帧并用 FFmpeg 补帧
+            interpolate: 是否使用 FFmpeg 插值补帧（仅在 key_frame_interval 生效）
 
         Returns:
             输出文件路径
         """
         total_frames = int(duration * self.fps)
+        frame_step = self._key_frame_step(key_frame_interval)
 
         with self._temp_dir() as tmpdir:
-            # 渲染所有帧
-            for frame_idx in range(total_frames):
-                current_time = frame_idx / self.fps
-                img = render_frame(current_time)
-                frame_path = tmpdir / f"frame_{frame_idx:06d}.png"
-                img.save(frame_path, "PNG")
+            if frame_step > 1:
+                total_keyframes = (total_frames + frame_step - 1) // frame_step
+                keyframe_idx = 0
+                for frame_idx in range(0, total_frames, frame_step):
+                    current_time = frame_idx / self.fps
+                    img = render_frame(current_time)
+                    frame_path = tmpdir / f"frame_{keyframe_idx:06d}.png"
+                    img.save(frame_path, "PNG")
 
-                if progress_callback:
-                    progress_callback(frame_idx + 1, total_frames)
+                    if progress_callback:
+                        progress_callback(keyframe_idx + 1, total_keyframes)
+                    keyframe_idx += 1
 
-            # FFmpeg 合成
-            self._ffmpeg_encode(tmpdir, output_path, format)
+                filter_chain = f"fps={self.fps}"
+                if interpolate:
+                    filter_chain += ",minterpolate=mi_mode=mci:mc_mode=aobmc:vsbmc=1"
+
+                input_fps = self.fps / frame_step
+                self._ffmpeg_encode(
+                    tmpdir,
+                    output_path,
+                    format,
+                    input_fps=input_fps,
+                    filter_arg=filter_chain,
+                )
+            else:
+                # 渲染所有帧
+                for frame_idx in range(total_frames):
+                    current_time = frame_idx / self.fps
+                    img = render_frame(current_time)
+                    frame_path = tmpdir / f"frame_{frame_idx:06d}.png"
+                    img.save(frame_path, "PNG")
+
+                    if progress_callback:
+                        progress_callback(frame_idx + 1, total_frames)
+
+                # FFmpeg 合成
+                self._ffmpeg_encode(tmpdir, output_path, format)
 
         return output_path
 
-    def _ffmpeg_encode(self, frames_dir: Path, output_path: Path, format: str) -> None:
+    def _ffmpeg_encode(
+        self,
+        frames_dir: Path,
+        output_path: Path,
+        format: str,
+        *,
+        input_fps: float | None = None,
+        filter_arg: str | None = None,
+    ) -> None:
         """调用 FFmpeg 合成视频"""
+        input_fps = self.fps if input_fps is None else input_fps
         if format == "mp4":
             # MP4 (H.264) - 通用格式，浏览器兼容，文件小
             cmd = [
                 "ffmpeg",
                 "-y",
-                "-framerate", str(self.fps),
+                "-framerate", str(input_fps),
                 "-i", str(frames_dir / "frame_%06d.png"),
+            ]
+            if filter_arg:
+                cmd.extend(["-vf", filter_arg])
+            cmd += [
                 "-c:v", "libx264",
                 "-pix_fmt", "yuv420p",
                 "-crf", "18",
@@ -141,8 +185,12 @@ class VideoEncoder:
             cmd = [
                 "ffmpeg",
                 "-y",
-                "-framerate", str(self.fps),
+                "-framerate", str(input_fps),
                 "-i", str(frames_dir / "frame_%06d.png"),
+            ]
+            if filter_arg:
+                cmd.extend(["-vf", filter_arg])
+            cmd += [
                 "-c:v", "png",
                 "-pix_fmt", "rgba",
                 str(output_path),
@@ -152,3 +200,10 @@ class VideoEncoder:
 
         if result.returncode != 0:
             raise RuntimeError(f"FFmpeg 执行失败: {result.stderr}")
+
+    def _key_frame_step(self, key_frame_interval: float | None) -> int:
+        if key_frame_interval is None:
+            return 1
+        if key_frame_interval <= 0:
+            return 1
+        return max(1, int(self.fps * key_frame_interval))
