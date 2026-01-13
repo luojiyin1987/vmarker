@@ -264,6 +264,8 @@ def generate(
     progress_callback: ProgressCallback | None = None,
     format: str = "mp4",
     scheme: ColorScheme | None = None,
+    key_frame_interval: float | None = None,
+    interpolate: bool = True,
 ) -> Path:
     """
     生成章节进度条视频
@@ -274,6 +276,8 @@ def generate(
         progress_callback: 进度回调
         format: 输出格式 ("mp4" 通用格式 / "mov" 透明背景)
         scheme: 配色方案（可选，不传则使用 config.theme）
+        key_frame_interval: 关键帧间隔（秒），设置后只渲染关键帧并用 FFmpeg 补帧
+        interpolate: 是否使用 FFmpeg 插值补帧（仅在 key_frame_interval 生效）
 
     Returns:
         输出文件路径
@@ -294,6 +298,8 @@ def generate(
         output_path,
         progress_callback=progress_callback,
         format=format,
+        key_frame_interval=key_frame_interval,
+        interpolate=interpolate,
     )
 
 
