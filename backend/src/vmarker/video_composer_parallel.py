@@ -255,13 +255,13 @@ async def compose_segments_parallel(
     return [outputs[i] for i in range(len(segments)) if i in outputs]
 
 
-def concat_segments(
+async def concat_segments(
     segment_paths: list[Path],
     output_path: Path,
     reencode: bool = False,
 ) -> Path:
     """
-    拼接分片
+    拼接分片（异步）
 
     Args:
         segment_paths: 分片文件路径列表（按顺序）
@@ -292,9 +292,14 @@ def concat_segments(
             "-c", "copy",
             str(output_path),
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await process.communicate()
 
-        if result.returncode == 0 and output_path.exists():
+        if process.returncode == 0 and output_path.exists():
             return output_path
 
     # 降级到重编码拼接
@@ -310,10 +315,16 @@ def concat_segments(
         "-b:a", "128k",
         str(output_path),
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await process.communicate()
 
-    if result.returncode != 0:
-        raise RuntimeError(f"FFmpeg 拼接失败: {result.stderr}")
+    if process.returncode != 0:
+        error_msg = stderr.decode("utf-8", errors="ignore")[-500:]
+        raise RuntimeError(f"FFmpeg 拼接失败: {error_msg}")
 
     return output_path
 
@@ -373,27 +384,33 @@ async def compose_vstack_parallel(
         serial_config = CompositionConfig(position=config.position)
         return compose_vstack(source_video, bar_video, output_path, serial_config)
 
-    # 2. 并行合成分片
+    # 用于追踪需要清理的分片文件
+    segment_outputs: list[Path] = []
     output_dir = output_path.parent
-    segment_outputs = await compose_segments_parallel(
-        source_video, bar_video, segments, output_dir, config, source_info
-    )
-
-    if len(segment_outputs) != len(segments):
-        raise RuntimeError(f"部分分片合成失败: {len(segment_outputs)}/{len(segments)} 成功")
-
-    # 3. 拼接分片
-    concat_segments(segment_outputs, output_path, reencode=False)
-
-    # 4. 清理临时分片
-    cleanup_segments(segment_outputs)
-
-    # 清理 concat 列表文件
     concat_file = output_dir / "segments.txt"
+
     try:
-        if concat_file.exists():
-            concat_file.unlink()
-    except Exception:
-        pass
+        # 2. 并行合成分片
+        segment_outputs = await compose_segments_parallel(
+            source_video, bar_video, segments, output_dir, config, source_info
+        )
+
+        if len(segment_outputs) != len(segments):
+            raise RuntimeError(f"部分分片合成失败: {len(segment_outputs)}/{len(segments)} 成功")
+
+        # 3. 拼接分片
+        await concat_segments(segment_outputs, output_path, reencode=False)
+
+        return output_path
+    finally:
+        # 4. 无论成功失败都清理临时分片
+        cleanup_segments(segment_outputs)
+
+        # 清理 concat 列表文件
+        try:
+            if concat_file.exists():
+                concat_file.unlink()
+        except Exception:
+            pass
 
     return output_path
