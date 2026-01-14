@@ -5,8 +5,7 @@
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
 
-import asyncio
-from pathlib import Path
+from pathlib import Path    
 
 import pytest
 

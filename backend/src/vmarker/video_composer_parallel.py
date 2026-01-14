@@ -37,7 +37,10 @@ def _parse_int_env(key: str, default: int) -> int:
     if value is None:
         return default
     try:
-        return int(value)
+        parsed = int(value)
+        if parsed <= 0:
+            return default
+        return parsed
     except ValueError:
         return default
 
