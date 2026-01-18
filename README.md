@@ -414,6 +414,23 @@ ruff check src/
 ruff format src/
 ```
 
+### 性能基准
+
+对比串行/并行合成耗时与资源占用：
+
+```bash
+python scripts/benchmark-compose.py \
+  --source /path/to/source.mp4 \
+  --bar /path/to/bar.mp4 \
+  --output-dir ./benchmark-output
+```
+
+脚本烟雾测试：
+
+```bash
+bash scripts/benchmark-compose-smoke.sh
+```
+
 ---
 
 ## 📄 许可证
